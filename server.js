@@ -3,25 +3,30 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Разрешаем CORS и парсинг JSON
 app.use(cors());
 app.use(express.json());
 
-// Обработчик ВСЕХ голосовых команд
+// --- ЭТО ГЛАВНАЯ ЛОГИКА, КОТОРАЯ БУДЕТ ПРАВИЛЬНО ОТВЕЧАТЬ ---
 app.post('/api/hook', (req, res) => {
-    // Извлекаем команду пользователя из запроса Сбера
-    const command = req.body?.request?.command || req.body?.command || '';
+    console.log('➡️ Получена команда:', req.body?.request?.command);
+
+    // Извлекаем команду пользователя
+    const command = (req.body?.request?.command || req.body?.command || '').toLowerCase();
     const session = req.body?.session || { new: false };
-    
     let responseText = '';
 
-    // --- Логика обработки команд ---
+    // --- ПРАВИЛЬНАЯ ОБРАБОТКА КОМАНД ---
     if (command.includes('помощь')) {
         responseText = 'Доступные команды: "группа A", "группа B", "лучшие третьи", "сетка", "сбросить всё"';
     }
-    else if (command.match(/группа [a-l]/i)) {
-        const groupLetter = command.match(/группа ([a-l])/i)[1].toUpperCase();
-        responseText = `Открываю группу ${groupLetter}. Используйте интерфейс для расстановки мест.`;
+    else if (command.includes('группа a')) {
+        responseText = 'Открываю группу A. Используйте интерфейс для расстановки мест.';
+    }
+    else if (command.includes('группа b')) {
+        responseText = 'Открываю группу B. Используйте интерфейс для расстановки мест.';
+    }
+    else if (command.includes('группа')) {
+        responseText = 'Назовите группу от A до L. Например: "группа A"';
     }
     else if (command.includes('лучшие третьи')) {
         responseText = 'Перехожу к выбору лучших третьих мест. Выберите 8 команд на экране.';
@@ -35,9 +40,9 @@ app.post('/api/hook', (req, res) => {
     else {
         responseText = 'Чемпионат мира 2026. Скажите "помощь" для списка команд.';
     }
-    // ---------------------------------
+    // ---------------------------------------------
 
-    // Отправляем ответ обратно ассистенту Сбера
+    console.log(`✅ Ответ: ${responseText}`);
     res.json({
         version: '1.0',
         session: session,
@@ -48,14 +53,14 @@ app.post('/api/hook', (req, res) => {
         }
     });
 });
+// -----------------------------------------------------
 
-// Простой ответ на корневой путь, чтобы проверить, что сервер жив
+// Простой ответ для проверки работы сервера в браузере
 app.get('/', (req, res) => {
     res.send('Webhook server is running');
 });
 
-// Запускаем сервер
 app.listen(PORT, () => {
     console.log(`✅ Сервер запущен на порту ${PORT}`);
-    console.log(`🌐 Вебхук доступен по адресу: /api/hook`);
+    console.log(`🌐 Вебхук: https://worldcup-webhook.onrender.com/api/hook`);
 });
