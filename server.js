@@ -1,17 +1,16 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname));
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+// Удалите эти строки (они не нужны для вебхука):
+// app.use(express.static(__dirname));
+// app.get('/', (req, res) => { ... });
 
+// Только вебхук
 app.post('/api/hook', (req, res) => {
     const { request, session } = req.body;
     const command = request?.command || '';
@@ -53,7 +52,12 @@ app.post('/api/hook', (req, res) => {
     });
 });
 
+// Обработка корневого маршрута (просто для проверки)
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'Webhook server is running' });
+});
+
 app.listen(PORT, () => {
     console.log(`✅ Сервер запущен на порту ${PORT}`);
-    console.log(`🌐 Вебхук: http://localhost:${PORT}/api/hook`);
+    console.log(`🌐 Вебхук: /api/hook`);
 });
