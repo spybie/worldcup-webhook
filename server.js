@@ -6,49 +6,108 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// === ОБРАБОТЧИК ВЕБХУКА ДЛЯ СБЕРА ===
 app.post('/api/hook', (req, res) => {
-    const command = req.body?.request?.command || '';
+    const { request, session } = req.body;
+    const command = request?.command || '';
+    const originalUtterance = request?.original_utterance || '';
     
-    let responseText = '';
+    console.log(`[HOOK] Команда: ${command}`);
+    console.log(`[HOOK] Исходная фраза: ${originalUtterance}`);
     
-    if (command === 'помощь') {
-        responseText = 'Доступные команды: группа A, группа B, лучшие третьи, сетка, сбросить всё';
+    let reply = {
+        text: '',
+        tts: ''
+    };
+    
+    // === АНАЛИЗ КОМАНД (как в brokely) ===
+    const lowerCommand = command.toLowerCase();
+    const lowerUtterance = originalUtterance.toLowerCase();
+    
+    // Группы A-L
+    const groupMatch = lowerCommand.match(/группа\s+([a-l])/i) || lowerUtterance.match(/группа\s+([a-l])/i);
+    if (groupMatch) {
+        const groupLetter = groupMatch[1].toUpperCase();
+        reply.text = `Открываю группу ${groupLetter}. Используйте интерфейс для расстановки мест.`;
+        reply.tts = reply.text;
     }
-    else if (command === 'группа A') {
-        responseText = 'Открываю группу A. Используйте интерфейс для расстановки мест.';
+    // Лучшие третьи
+    else if (lowerCommand.includes('лучшие третьи') || lowerUtterance.includes('лучшие третьи')) {
+        reply.text = 'Перехожу к выбору лучших третьих мест. Выберите 8 команд на экране.';
+        reply.tts = reply.text;
     }
-    else if (command === 'группа B') {
-        responseText = 'Открываю группу B. Используйте интерфейс для расстановки мест.';
+    // Сетка плей-офф
+    else if (lowerCommand.includes('сетка') || lowerUtterance.includes('сетка') ||
+             lowerCommand.includes('плей-офф') || lowerUtterance.includes('плей-офф')) {
+        reply.text = 'Перехожу к сетке плей-офф. Кликайте на команды, чтобы выбирать победителей.';
+        reply.tts = reply.text;
     }
-    else if (command === 'лучшие третьи') {
-        responseText = 'Перехожу к выбору лучших третьих мест. Выберите 8 команд на экране.';
+    // Сброс
+    else if (lowerCommand.includes('сбросить') || lowerUtterance.includes('сбросить') ||
+             lowerCommand.includes('начать заново') || lowerUtterance.includes('начать заново')) {
+        reply.text = 'Сбрасываю все данные. Начинайте заново.';
+        reply.tts = reply.text;
     }
-    else if (command === 'сетка') {
-        responseText = 'Перехожу к сетке плей-офф. Кликайте на команды, чтобы выбирать победителей.';
+    // Помощь
+    else if (lowerCommand === 'помощь' || lowerCommand === 'help' || lowerUtterance.includes('помощь')) {
+        reply.text = 'Доступные команды: группа A, группа B, лучшие третьи, сетка плей-офф, сбросить всё';
+        reply.tts = reply.text;
     }
-    else if (command === 'сбросить всё') {
-        responseText = 'Сбрасываю все данные. Начинайте заново.';
-    }
+    // Неизвестная команда
     else {
-        responseText = 'Чемпионат мира 2026. Скажите "помощь" для списка команд.';
+        reply.text = 'Чемпионат мира 2026. Скажите "помощь" для списка доступных команд.';
+        reply.tts = reply.text;
     }
     
-    res.json({
+    // Формируем ответ для Сбера
+    const response = {
         version: '1.0',
-        session: req.body?.session || { new: false },
+        session: session || { new: false },
         response: {
-            text: responseText,
-            tts: responseText,
+            text: reply.text,
+            tts: reply.tts,
             end_session: false
+        },
+        payload: {
+            command: command,
+            action: 'update_frontend'
         }
-    });
+    };
+    
+    console.log(`[HOOK] Ответ: ${reply.text}`);
+    res.json(response);
 });
 
+// === ДОПОЛНИТЕЛЬНЫЙ ЭНДПОИНТ ДЛЯ ГОЛОСА (как в brokely) ===
+app.post('/api/voice', (req, res) => {
+    const { text, session } = req.body;
+    console.log(`[VOICE] Распознано: ${text}`);
+    
+    // Перенаправляем на основной обработчик
+    const fakeReq = { body: { request: { command: text, original_utterance: text }, session } };
+    const fakeRes = {
+        json: (data) => {
+            console.log(`[VOICE] Ответ отправлен`);
+            res.json(data);
+        }
+    };
+    
+    // Вызываем основной обработчик
+    app._router.handle(fakeReq, fakeRes, () => {});
+});
+
+// Проверка работы сервера
 app.get('/', (req, res) => {
-    res.json({ status: 'ok', message: 'Webhook is ready' });
+    res.json({ 
+        status: 'ok', 
+        message: 'ЧМ-2026 вебхук работает',
+        version: '1.0',
+        endpoints: ['POST /api/hook', 'POST /api/voice']
+    });
 });
 
 app.listen(PORT, () => {
     console.log(`✅ Сервер запущен на порту ${PORT}`);
-    console.log(`🌐 Вебхук: /api/hook`);
+    console.log(`🌐 Вебхук: http://localhost:${PORT}/api/hook`);
+    console.log(`🎤 Голосовой эндпоинт: http://localhost:${PORT}/api/voice`);
 });
